@@ -37,6 +37,14 @@ export async function signInWithEmail(email, password) {
   if (error) throw error;
 }
 
+// メール/パスワード不要のゲスト参加(匿名認証)。ランクは付かないが即座に部屋へ参加できる。
+export async function signInAsGuest(displayName) {
+  const { error } = await supabase.auth.signInAnonymously({
+    options: { data: { name: displayName?.trim().slice(0, 16) || 'ゲスト' } },
+  });
+  if (error) throw error;
+}
+
 export async function signOut() {
   await supabase.auth.signOut();
   currentUser = null;

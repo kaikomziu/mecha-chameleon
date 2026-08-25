@@ -1,4 +1,4 @@
-import { initAuth, onAuthChange, signInWithEmail, signUpWithEmail, signOut, updateDisplayName, getUser } from './auth.js';
+import { initAuth, onAuthChange, signInWithEmail, signUpWithEmail, signInAsGuest, signOut, updateDisplayName, getUser } from './auth.js';
 import { createRoom, joinRoomByCode, listPublicRooms, leaveRoom, setReady, fetchRoomPlayers, fetchRoom, startGame, subscribeRoom, addBot, removeBot } from './rooms.js';
 import { rankTierForWins, nextRankThreshold, GAME_CONFIG } from './config.js';
 import { fetchLeaderboard } from './rank.js';
@@ -77,10 +77,19 @@ $('#btn-signup').addEventListener('click', () => withLoading($('#btn-signup'), '
   }
 }));
 
+$('#btn-guest').addEventListener('click', () => withLoading($('#btn-guest'), '参加中…', async () => {
+  try {
+    await signInAsGuest($('#guest-name').value);
+  } catch (e) {
+    setAuthMessage('ゲスト参加に失敗しました: ' + translateAuthError(e.message), true);
+  }
+}));
+
 function translateAuthError(msg) {
   if (/Invalid login credentials/i.test(msg)) return 'メールアドレスまたはパスワードが間違っています';
   if (/User already registered/i.test(msg)) return 'このメールアドレスは既に登録されています';
   if (/Email not confirmed/i.test(msg)) return 'メール確認がまだ完了していません(管理者に設定解除を依頼してください)';
+  if (/Anonymous sign-ins? (is|are) disabled/i.test(msg)) return 'ゲスト参加が管理者側でまだ有効化されていません';
   return msg;
 }
 
