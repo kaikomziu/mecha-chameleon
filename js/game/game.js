@@ -5,6 +5,7 @@ import { Controls } from './controls.js';
 import { PaintController } from './paint.js';
 import { BotAI } from './botAI.js';
 import { GameChannel, throttle } from '../network.js';
+import { mountChat } from '../chatUI.js';
 import { supabase } from '../supabaseClient.js';
 import { endRound, backToLobby, advancePhase } from '../rooms.js';
 import { getUser, refreshProfile } from '../auth.js';
@@ -32,6 +33,7 @@ export class Game {
     this._initCharacterAndControls();
     this._initHUD();
     this._initNetwork();
+    this.chatWidget = mountChat(this.uiRoot, this.room.id, { compact: true });
 
     this.botAI = new BotAI({
       world: this.world,
@@ -485,6 +487,7 @@ export class Game {
     clearTimeout(this._backToLobbyTimer);
     window.removeEventListener('resize', this._onResize);
     this.botAI.destroy();
+    this.chatWidget.destroy();
     this.channel.destroy();
     this.renderer.dispose();
     this.renderer.domElement.remove();

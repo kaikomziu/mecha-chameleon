@@ -93,13 +93,25 @@ export async function joinRoomByCode(code) {
     .eq('code', normalized)
     .maybeSingle();
   if (error || !room) throw new Error('その部屋コードは見つかりませんでした');
-  if (room.status !== 'waiting') throw new Error('その部屋はすでにゲーム中です');
 
-  const { count } = await supabase
+  // 既にその部屋のメンバーなら(F5リロード等での再入室)、満員/進行中チェックは無視して
+  // 自分の座席にそのまま戻す。新規参加者だけを人数・状態でブロックする。
+  const user = getUser();
+  const { data: existing } = await supabase
     .from('mc_room_players')
-    .select('*', { count: 'exact', head: true })
-    .eq('room_id', room.id);
-  if ((count ?? 0) >= room.max_players) throw new Error('その部屋は満員です');
+    .select('user_id')
+    .eq('room_id', room.id)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!existing) {
+    if (room.status !== 'waiting') throw new Error('その部屋はすでにゲーム中です');
+    const { count } = await supabase
+      .from('mc_room_players')
+      .select('*', { count: 'exact', head: true })
+      .eq('room_id', room.id);
+    if ((count ?? 0) >= room.max_players) throw new Error('その部屋は満員です');
+  }
 
   await joinExistingRoom(room.id);
   return room;

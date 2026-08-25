@@ -2,6 +2,7 @@ import { initAuth, onAuthChange, signInWithEmail, signUpWithEmail, signInAsGuest
 import { createRoom, joinRoomByCode, listPublicRooms, leaveRoom, setReady, fetchRoomPlayers, fetchRoom, startGame, subscribeRoom, addBot, removeBot } from './rooms.js';
 import { rankTierForWins, nextRankThreshold, GAME_CONFIG } from './config.js';
 import { fetchLeaderboard } from './rank.js';
+import { mountChat } from './chatUI.js';
 import { Game } from './game/game.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -21,6 +22,7 @@ let state = {
   players: [],
   unsubRoom: null,
   game: null,
+  roomChat: null,
 };
 
 // ============ 認証 ============
@@ -95,9 +97,19 @@ function translateAuthError(msg) {
 
 $('#btn-logout').addEventListener('click', () => signOut());
 
+let triedAutoRejoin = false;
 onAuthChange((user, profile) => {
   if (!user) { showScreen('auth'); return; }
-  if (!state.roomId) showScreen('lobby');
+  if (!state.roomId) {
+    showScreen('lobby');
+    const savedCode = localStorage.getItem('mc_active_room_code');
+    if (savedCode && !triedAutoRejoin) {
+      triedAutoRejoin = true;
+      joinRoomByCode(savedCode)
+        .then((room) => enterRoom(room.id, room.code))
+        .catch(() => localStorage.removeItem('mc_active_room_code')); // 部屋が無くなっている等
+    }
+  }
   if (profile) renderProfile(profile);
 });
 
@@ -143,7 +155,7 @@ $('#btn-create-room').addEventListener('click', async () => {
       maxPlayers: Number($('#create-max').value),
       hiderCount: Number($('#create-hiders').value),
     });
-    await enterRoom(room.id);
+    await enterRoom(room.id, room.code);
   } catch (e) {
     alert('部屋を作成できませんでした: ' + e.message);
   }
@@ -153,7 +165,7 @@ $('#btn-create-room').addEventListener('click', async () => {
 $('#btn-join-code').addEventListener('click', async () => {
   try {
     const room = await joinRoomByCode($('#join-code-input').value);
-    await enterRoom(room.id);
+    await enterRoom(room.id, room.code);
   } catch (e) {
     alert(e.message);
   }
@@ -179,7 +191,7 @@ async function refreshPublicRooms() {
       row.innerHTML = `<div><b>${escapeHtml(r.name)}</b><span class="muted"> ${count}/${r.max_players}人</span></div>
         <button class="btn-small">参加</button>`;
       row.querySelector('button').addEventListener('click', async () => {
-        try { const room = await joinRoomByCode(r.code); await enterRoom(room.id); }
+        try { const room = await joinRoomByCode(r.code); await enterRoom(room.id, room.code); }
         catch (e) { alert(e.message); }
       });
       list.appendChild(row);
@@ -212,9 +224,11 @@ async function refreshLeaderboard() {
 }
 
 // ============ 部屋(待機room) ============
-async function enterRoom(roomId) {
+async function enterRoom(roomId, code) {
   state.roomId = roomId;
+  if (code) localStorage.setItem('mc_active_room_code', code);
   showScreen('room');
+  state.roomChat = mountChat($('#room-chat-root'), roomId);
   await refreshRoomView();
   state.unsubRoom = subscribeRoom(roomId, {
     onRoomChange: (room) => onRoomUpdate(room),
@@ -246,6 +260,7 @@ async function onRoomUpdate(room) {
     state.game.destroy();
     state.game = null;
     showScreen('room');
+    state.roomChat = mountChat($('#room-chat-root'), state.roomId);
     return;
   }
   if (room.status !== 'waiting') {
@@ -259,6 +274,8 @@ async function onRoomUpdate(room) {
 function mountGameIfNeeded() {
   if (state.game) return;
   showScreen('game');
+  state.roomChat?.destroy(); // ゲーム画面側のチャットに一本化
+  state.roomChat = null;
   state.game = new Game({
     container: $('#game-canvas-root'),
     uiRoot: $('#game-ui-root'),
@@ -329,9 +346,11 @@ $('#btn-copy-url').addEventListener('click', () => {
 
 async function leaveCurrentRoom() {
   if (state.roomId) await leaveRoom(state.roomId);
+  localStorage.removeItem('mc_active_room_code');
   state.unsubRoom?.();
   state.game?.destroy();
-  state = { roomId: null, room: null, players: [], unsubRoom: null, game: null };
+  state.roomChat?.destroy();
+  state = { roomId: null, room: null, players: [], unsubRoom: null, game: null, roomChat: null };
   showScreen('lobby');
 }
 
