@@ -1,8 +1,9 @@
 import * as THREE from 'https://esm.sh/three@0.160.0';
-import { buildWorld, resolveCollisions } from './world.js';
+import { buildWorld, resolveCollisions, randomSpawnPoint } from './world.js';
 import { Character, POSES } from './character.js';
 import { Controls } from './controls.js';
 import { PaintController } from './paint.js';
+import { BotAI } from './botAI.js';
 import { GameChannel, throttle } from '../network.js';
 import { supabase } from '../supabaseClient.js';
 import { endRound, backToLobby, advancePhase } from '../rooms.js';
@@ -31,6 +32,14 @@ export class Game {
     this._initCharacterAndControls();
     this._initHUD();
     this._initNetwork();
+
+    this.botAI = new BotAI({
+      world: this.world,
+      sendPos: (p) => this._botSendPos(p),
+      sendPaint: (p) => this._botSendPaint(p),
+      triggerFound: (targetUserId, byBotId) => this._botTriggerFound(targetUserId, byBotId),
+    });
+    this.botAI.setBots(this.players.filter((p) => p.is_bot));
 
     this.clock = new THREE.Clock();
     this._raf = requestAnimationFrame(this._tick.bind(this));
@@ -69,14 +78,7 @@ export class Game {
   }
 
   _spawnPoint() {
-    const r = this.world.roomSize / 2 - 2;
-    for (let i = 0; i < 20; i++) {
-      const x = (Math.random() * 2 - 1) * r;
-      const z = (Math.random() * 2 - 1) * r;
-      const [rx, rz] = resolveCollisions(x, z, PLAYER_RADIUS, this.world.colliders);
-      if (Math.abs(rx - x) < 0.01 && Math.abs(rz - z) < 0.01) return [x, z];
-    }
-    return [0, 0];
+    return randomSpawnPoint(this.world);
   }
 
   _initCharacterAndControls() {
@@ -138,6 +140,7 @@ export class Game {
   // ============ フェーズ制御 ============
   setPlayers(players) {
     this.players = players;
+    if (this.isHost) this.botAI.setBots(players.filter((p) => p.is_bot));
   }
 
   setPhase(room) {
@@ -179,6 +182,7 @@ export class Game {
     this._setOverlay(isHider ? null : '鬼は目を閉じて待機中…\n隠れる側が擬態しています');
 
     if (isHider) this._openPaintMode();
+    if (this.isHost) this.botAI.enterHiding();
   }
 
   _enterSeeking(prevStatus) {
@@ -195,6 +199,7 @@ export class Game {
     this.hud.querySelector('.crosshair').classList.toggle('hidden', !isHunter);
     this.hud.querySelector('.hud-repaint').classList.add('hidden');
     this._setOverlay(this.caught ? '見つかってしまった…\n結果発表をお待ちください' : null);
+    if (this.isHost) this.botAI.enterSeeking();
   }
 
   _enterResults() {
@@ -308,18 +313,52 @@ export class Game {
   }
 
   _onHiderFound(p) {
-    this.aliveHiders.delete(p.targetUserId);
-    const r = this.remote.get(p.targetUserId);
-    if (r) { this._removeRemote(r); this.remote.delete(p.targetUserId); }
-    if (p.targetUserId === this.myId) {
+    this._applyHiderFound(p.targetUserId);
+  }
+
+  // 隠れる側1人が見つかったときの共通処理。自分の発砲・他人の発砲(ネットワーク受信)・
+  // CPUの発砲のいずれからも同じ経路で呼ばれる。
+  _applyHiderFound(targetUserId) {
+    this.aliveHiders.delete(targetUserId);
+    const r = this.remote.get(targetUserId);
+    if (r) { this._removeRemote(r); this.remote.delete(targetUserId); }
+    const p = this.players.find((pl) => pl.user_id === targetUserId);
+    if (p) p.alive = false;
+
+    if (targetUserId === this.myId) {
       this.caught = true;
       supabase.from('mc_room_players').update({ alive: false }).eq('room_id', this.room.id).eq('user_id', this.myId);
       this._setOverlay('見つかってしまった…\n結果発表をお待ちください');
       this.controls.setEnabled(false);
+    } else if (this.isHost && p?.is_bot) {
+      // ボットは自分でDBを更新できないのでホストが代理更新
+      supabase.from('mc_room_players').update({ alive: false }).eq('room_id', this.room.id).eq('user_id', targetUserId);
     }
     this._updateAliveHUD();
     if (this.isHost && this.room.status === 'seeking' && this.aliveHiders.size === 0) {
       endRound(this.room, 'hunter', this.players);
+    }
+  }
+
+  // ============ CPU用ブロードキャスト橋渡し(ホストのみ) ============
+  // self:false のBroadcastは送信者自身には返ってこないため、ホストの画面にも
+  // ボットを映すには送信と同時にローカルにも同じ処理を直接適用する。
+  _botSendPos(payload) {
+    this.channel.send('pos', payload);
+    this._onRemotePos(payload);
+  }
+  _botSendPaint(payload) {
+    this.channel.send('paint', payload);
+    this._onRemotePaint(payload);
+  }
+  _botTriggerFound(targetUserId, byBotId) {
+    this.channel.send('hider_found', { targetUserId, by: byBotId });
+    this._applyHiderFound(targetUserId);
+  }
+  *_aliveHiderPositions() {
+    for (const id of this.aliveHiders) {
+      const r = this.remote.get(id);
+      if (r) yield [id, { x: r.target.x, z: r.target.z }];
     }
   }
 
@@ -346,12 +385,12 @@ export class Game {
     if (this.isHost) this._maybeSkipPhase();
   }
   _updateVoteButton() {
-    const total = this.players.length || 1;
+    const total = this.players.filter((p) => !p.is_bot).length || 1; // CPUは投票に数えない
     this.hud.querySelector('.hud-vote-skip').textContent = `もうええよ (${this.votedSkip.size}/${total})`;
   }
   _maybeSkipPhase() {
     if (!this.isHost) return;
-    const total = this.players.length || 1;
+    const total = this.players.filter((p) => !p.is_bot).length || 1;
     if (this.votedSkip.size > total / 2) this._resolvePhaseEnd();
   }
 
@@ -369,11 +408,7 @@ export class Game {
     if (pid && this.remote.get(pid)?.role === 'hider') {
       this._flashHit(true);
       this.channel.send('hider_found', { targetUserId: pid, by: this.myId });
-      this.aliveHiders.delete(pid);
-      const r = this.remote.get(pid);
-      if (r) { this._removeRemote(r); this.remote.delete(pid); }
-      this._updateAliveHUD();
-      if (this.aliveHiders.size === 0) endRound(this.room, 'hunter', this.players);
+      this._applyHiderFound(pid);
     } else {
       this._flashHit(false);
     }
@@ -426,6 +461,11 @@ export class Game {
       if (r.role === 'hunter') r.group.rotation.y += (r.target.yaw - r.group.rotation.y) * Math.min(1, dt * 8);
     }
 
+    // ホスト: CPUの索敵AIをシミュレート
+    if (this.isHost && this.room.status === 'seeking') {
+      this.botAI.tick(dt, performance.now(), () => this._aliveHiderPositions());
+    }
+
     // ホスト: フェーズタイムアウトの監視
     if (this.isHost && this.room.phase_ends_at) {
       const remain = new Date(this.room.phase_ends_at).getTime() - Date.now();
@@ -444,6 +484,7 @@ export class Game {
     cancelAnimationFrame(this._raf);
     clearTimeout(this._backToLobbyTimer);
     window.removeEventListener('resize', this._onResize);
+    this.botAI.destroy();
     this.channel.destroy();
     this.renderer.dispose();
     this.renderer.domElement.remove();

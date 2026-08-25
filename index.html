@@ -26,7 +26,6 @@
       <label class="field-label">メールアドレス<input id="login-email" type="email" autocomplete="email" placeholder="you@example.com"></label>
       <label class="field-label">パスワード<input id="login-password" type="password" autocomplete="current-password" placeholder="••••••••"></label>
       <button id="btn-login" class="btn-primary">ログイン</button>
-      <button id="btn-forgot-password" class="btn-ghost small">パスワードを忘れた場合</button>
     </div>
 
     <div id="auth-pane-signup" class="auth-pane hidden">
@@ -44,18 +43,6 @@
       そのコンセプトをブラウザ向けに再構築したものであり、本家とは一切関係ありません。<br>
       ぜひ本家もSteamでチェックしてみてください。
     </p>
-  </div>
-</section>
-
-<!-- ============ パスワード再設定画面 ============ -->
-<section id="screen-reset-password" class="screen hidden">
-  <div class="auth-card">
-    <div class="auth-logo">🔑</div>
-    <h1>新しいパスワードを設定</h1>
-    <p class="auth-sub">メールのリンクから開かれました。新しいパスワードを入力してください。</p>
-    <label class="field-label">新しいパスワード(6文字以上)<input id="reset-new-password" type="password" autocomplete="new-password" placeholder="••••••••"></label>
-    <button id="btn-update-password" class="btn-primary">パスワードを更新</button>
-    <p id="reset-message" class="auth-hint"></p>
   </div>
 </section>
 
@@ -145,8 +132,12 @@
   <div id="room-host-settings" class="muted small hidden">カメレオン(隠れる側): <span id="room-hider-count-live">1</span>人 ※部屋作成時に設定</div>
 
   <div class="room-players-block">
-    <div class="row-between"><b>参加者 (<span id="room-player-count">0人</span>)</b></div>
+    <div class="row-between">
+      <b>参加者 (<span id="room-player-count">0人</span>)</b>
+      <button id="btn-add-bot" class="btn-small hidden">🤖 ボット追加</button>
+    </div>
     <div id="room-player-list" class="list-block"></div>
+    <p class="muted small">🤖 人数が足りないときはボット(CPU)を入れて一人でも練習できます</p>
   </div>
 
   <div class="room-actions">

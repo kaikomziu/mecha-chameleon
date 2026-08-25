@@ -1,5 +1,5 @@
-import { initAuth, onAuthChange, onPasswordRecovery, signInWithEmail, signUpWithEmail, resetPassword, updatePassword, signOut, updateDisplayName, getUser } from './auth.js';
-import { createRoom, joinRoomByCode, listPublicRooms, leaveRoom, setReady, fetchRoomPlayers, fetchRoom, startGame, subscribeRoom } from './rooms.js';
+import { initAuth, onAuthChange, signInWithEmail, signUpWithEmail, signOut, updateDisplayName, getUser } from './auth.js';
+import { createRoom, joinRoomByCode, listPublicRooms, leaveRoom, setReady, fetchRoomPlayers, fetchRoom, startGame, subscribeRoom, addBot, removeBot } from './rooms.js';
 import { rankTierForWins, nextRankThreshold, GAME_CONFIG } from './config.js';
 import { fetchLeaderboard } from './rank.js';
 import { Game } from './game/game.js';
@@ -10,7 +10,6 @@ const screens = {
   lobby: $('#screen-lobby'),
   room: $('#screen-room'),
   game: $('#screen-game'),
-  resetPassword: $('#screen-reset-password'),
 };
 function showScreen(name) {
   for (const k in screens) screens[k].classList.toggle('hidden', k !== name);
@@ -70,62 +69,27 @@ $('#btn-signup').addEventListener('click', () => withLoading($('#btn-signup'), '
   if (!email || !password) return setAuthMessage('メールアドレスとパスワードを入力してください', true);
   if (password.length < 6) return setAuthMessage('パスワードは6文字以上にしてください', true);
   try {
-    const { needsEmailConfirm } = await signUpWithEmail(email, password, name);
-    if (needsEmailConfirm) {
-      setAuthMessage('確認メールを送信しました。メール内のリンクを開いてからログインしてください(迷惑メールフォルダもご確認ください)');
-      document.querySelector('.auth-tab[data-pane="auth-pane-login"]').click();
-    }
+    const { hasSession } = await signUpWithEmail(email, password, name);
+    if (hasSession) return; // onAuthChangeが自動でロビーへ遷移させる
+    setAuthMessage('登録はできましたが、まだログインできません(管理者にメール確認の解除を依頼してください)', true);
   } catch (e) {
     setAuthMessage('登録に失敗しました: ' + translateAuthError(e.message), true);
-  }
-}));
-
-$('#btn-forgot-password').addEventListener('click', () => withLoading($('#btn-forgot-password'), '送信中…', async () => {
-  const email = $('#login-email').value;
-  if (!email) return setAuthMessage('メールアドレス欄にアドレスを入力してから押してください', true);
-  try {
-    await resetPassword(email);
-    setAuthMessage('パスワード再設定メールを送信しました');
-  } catch (e) {
-    setAuthMessage('送信に失敗しました: ' + translateAuthError(e.message), true);
   }
 }));
 
 function translateAuthError(msg) {
   if (/Invalid login credentials/i.test(msg)) return 'メールアドレスまたはパスワードが間違っています';
   if (/User already registered/i.test(msg)) return 'このメールアドレスは既に登録されています';
-  if (/Email not confirmed/i.test(msg)) return 'メール確認がまだ完了していません';
-  if (/email rate limit exceeded/i.test(msg)) return 'メール送信が混み合っています。1時間ほど待つか、管理者に確認メール必須設定の解除を依頼してください';
+  if (/Email not confirmed/i.test(msg)) return 'メール確認がまだ完了していません(管理者に設定解除を依頼してください)';
   return msg;
 }
 
 $('#btn-logout').addEventListener('click', () => signOut());
 
-let inRecoveryFlow = false;
-onPasswordRecovery(() => {
-  inRecoveryFlow = true;
-  showScreen('resetPassword');
-});
-
 onAuthChange((user, profile) => {
-  if (inRecoveryFlow) return; // パスワード再設定が終わるまで画面遷移しない
   if (!user) { showScreen('auth'); return; }
   if (!state.roomId) showScreen('lobby');
   if (profile) renderProfile(profile);
-});
-
-$('#btn-update-password').addEventListener('click', async () => {
-  const pw = $('#reset-new-password').value;
-  const msg = $('#reset-message');
-  if (pw.length < 6) { msg.textContent = 'パスワードは6文字以上にしてください'; msg.style.color = 'var(--danger)'; return; }
-  try {
-    await updatePassword(pw);
-    inRecoveryFlow = false;
-    showScreen('lobby');
-  } catch (e) {
-    msg.textContent = '更新に失敗しました: ' + e.message;
-    msg.style.color = 'var(--danger)';
-  }
 });
 
 function renderProfile(profile) {
@@ -264,7 +228,7 @@ async function refreshRoomPlayers() {
   state.game?.setPlayers(state.players);
 }
 
-function onRoomUpdate(room) {
+async function onRoomUpdate(room) {
   const wasWaiting = state.room?.status === 'waiting' || !state.room;
   state.room = room;
   renderRoomHeader();
@@ -276,6 +240,8 @@ function onRoomUpdate(room) {
     return;
   }
   if (room.status !== 'waiting') {
+    // 待機→隠れフェーズの瞬間は役割(role)がまだ届いていない可能性があるので先に最新を取得
+    if (wasWaiting) await refreshRoomPlayers();
     mountGameIfNeeded();
     state.game?.setPhase(room);
   }
@@ -303,27 +269,42 @@ function renderRoomHeader() {
   $('#btn-start-game').classList.toggle('hidden', !isHost);
   $('#room-host-settings').classList.toggle('hidden', !isHost);
   $('#room-hider-count-live').textContent = r.hider_count;
+  $('#btn-add-bot').classList.toggle('hidden', !isHost || state.players.length >= r.max_players);
 }
 
 function renderRoomPlayers() {
   const list = $('#room-player-list');
   list.innerHTML = '';
+  const isHost = state.room?.host_id === getUser()?.id;
   for (const p of state.players) {
     const row = document.createElement('div');
     row.className = 'room-row';
-    row.innerHTML = `<div>${p.is_host ? '👑' : ''} ${escapeHtml(p.display_name)}</div>
-      <div class="muted">${p.ready ? '準備OK' : ''}</div>`;
+    const label = `${p.is_host ? '👑 ' : ''}${p.is_bot ? '🤖 ' : ''}${escapeHtml(p.display_name)}`;
+    const rightBit = p.is_bot
+      ? (isHost ? '<button class="btn-small bot-remove-btn">外す</button>' : '<span class="muted">CPU</span>')
+      : `<span class="muted">${p.ready ? '準備OK' : ''}</span>`;
+    row.innerHTML = `<div>${label}</div><div>${rightBit}</div>`;
+    if (p.is_bot && isHost) {
+      row.querySelector('.bot-remove-btn').addEventListener('click', () => removeBot(state.roomId, p.user_id));
+    }
     list.appendChild(row);
   }
   $('#room-player-count').textContent = `${state.players.length}人`;
   const me = state.players.find((p) => p.user_id === getUser()?.id);
   $('#btn-ready').textContent = me?.ready ? '準備解除' : '準備OK';
   $('#btn-start-game').disabled = state.players.length < GAME_CONFIG.minPlayersToStart;
+  if (state.room) $('#btn-add-bot').classList.toggle('hidden', !isHost || state.players.length >= state.room.max_players);
 }
 
 $('#btn-ready').addEventListener('click', async () => {
   const me = state.players.find((p) => p.user_id === getUser()?.id);
   await setReady(state.roomId, !me?.ready);
+});
+
+$('#btn-add-bot').addEventListener('click', async () => {
+  if (!state.room || state.players.length >= state.room.max_players) return;
+  try { await addBot(state.room, state.players); }
+  catch (e) { alert('ボットを追加できませんでした: ' + e.message); }
 });
 
 $('#btn-start-game').addEventListener('click', async () => {

@@ -100,6 +100,32 @@ export function buildWorld(scene) {
   return { colliders, props, roomSize: ROOM_SIZE, roomHeight: ROOM_HEIGHT };
 }
 
+// 部屋の中からランダムな(何にも埋まっていない)スポーンポイントを1つ選ぶ
+export function randomSpawnPoint(world) {
+  const r = world.roomSize / 2 - 2;
+  for (let i = 0; i < 20; i++) {
+    const x = (Math.random() * 2 - 1) * r;
+    const z = (Math.random() * 2 - 1) * r;
+    const [rx, rz] = resolveCollisions(x, z, 0.38, world.colliders);
+    if (Math.abs(rx - x) < 0.01 && Math.abs(rz - z) < 0.01) return [x, z];
+  }
+  return [0, 0];
+}
+
+// 2点間の視線が家具・壁で遮られていないかを簡易判定(線分上を数点サンプリング)
+export function hasLineOfSight(x1, z1, x2, z2, colliders) {
+  const steps = 12;
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    const x = x1 + (x2 - x1) * t;
+    const z = z1 + (z2 - z1) * t;
+    for (const c of colliders) {
+      if (x > c.minX && x < c.maxX && z > c.minZ && z < c.maxZ) return false;
+    }
+  }
+  return true;
+}
+
 // 円柱(プレイヤー)とAABB群の簡易衝突解決。位置を押し出して返す。
 export function resolveCollisions(x, z, radius, colliders) {
   for (const c of colliders) {

@@ -3,16 +3,10 @@ import { supabase } from './supabaseClient.js';
 let currentUser = null;
 let currentProfile = null;
 const listeners = [];
-const recoveryListeners = [];
 
 export function onAuthChange(fn) {
   listeners.push(fn);
   if (currentUser !== undefined) fn(currentUser, currentProfile);
-}
-
-// パスワード再設定リンクを開いた直後(PASSWORD_RECOVERYイベント)に呼ばれる
-export function onPasswordRecovery(fn) {
-  recoveryListeners.push(fn);
 }
 
 function emit() {
@@ -34,26 +28,14 @@ export async function signUpWithEmail(email, password, displayName) {
     options: { data: { name: displayName?.trim().slice(0, 16) || 'プレイヤー' } },
   });
   if (error) throw error;
-  // メール確認が必須な設定の場合、sessionはまだ発行されない
-  return { needsEmailConfirm: !data.session };
+  // Supabase側の「Confirm email」がオンだと、ここではまだsessionが発行されない
+  return { hasSession: !!data.session };
 }
 
 export async function signInWithEmail(email, password) {
   const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
   if (error) throw error;
 }
-
-export async function resetPassword(email) {
-  const redirectTo = window.location.href.split('#')[0].split('?')[0];
-  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
-  if (error) throw error;
-}
-
-export async function updatePassword(newPassword) {
-  const { error } = await supabase.auth.updateUser({ password: newPassword });
-  if (error) throw error;
-}
-
 
 export async function signOut() {
   await supabase.auth.signOut();
@@ -110,11 +92,8 @@ export async function initAuth() {
   if (currentUser) await refreshProfile();
   else emit();
 
-  supabase.auth.onAuthStateChange(async (event, session) => {
+  supabase.auth.onAuthStateChange(async (_event, session) => {
     currentUser = session?.user ?? null;
-    if (event === 'PASSWORD_RECOVERY') {
-      for (const fn of recoveryListeners) fn();
-    }
     if (currentUser) await refreshProfile();
     else {
       currentProfile = null;
