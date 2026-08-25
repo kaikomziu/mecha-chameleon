@@ -1,5 +1,6 @@
 import * as THREE from 'https://esm.sh/three@0.160.0';
-import { buildWorld, resolveCollisions, randomSpawnPoint } from './world.js';
+import { buildWorld, resolveCollisions, randomSpawnPoint, nearestBackgroundColor } from './world.js';
+import { hexToRgb, colorSimilarity } from './colorUtils.js';
 import { Character, POSES } from './character.js';
 import { Controls } from './controls.js';
 import { PaintController } from './paint.js';
@@ -313,10 +314,18 @@ export class Game {
   _onRemotePaint(p) {
     if (p.userId === this.myId) return;
     const r = this._ensureRemote(p.userId, 'hider');
-    r.character?.applyPaintDataURL(p.dataUrl);
+    r.character?.applyPaintDataURL(p.dataUrl, () => this._updateCamouflage(r, p.x, p.z));
     if (p.pose) r.character.setPose(p.pose);
     r.target.x = p.x; r.target.z = p.z;
     r.group.position.set(p.x, 0, p.z);
+  }
+
+  // 塗った色と、その場所の家具・床の色がどれだけ近いかを0〜1で評価してボットの索敵速度に反映する
+  _updateCamouflage(r, x, z) {
+    if (!r.character) return;
+    if (!r.character.painted) { r.camouflage = 0; return; } // 何も塗っていなければ丸見え扱い
+    const bgRgb = hexToRgb(nearestBackgroundColor(x, z, this.world));
+    r.camouflage = colorSimilarity(r.character.getAverageColor(), bgRgb);
   }
 
   _onHiderFound(p) {
@@ -365,7 +374,7 @@ export class Game {
   *_aliveHiderPositions() {
     for (const id of this.aliveHiders) {
       const r = this.remote.get(id);
-      if (r) yield [id, { x: r.target.x, z: r.target.z }];
+      if (r) yield [id, { x: r.target.x, z: r.target.z, camouflage: r.camouflage ?? 0 }];
     }
   }
 

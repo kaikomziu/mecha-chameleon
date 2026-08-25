@@ -110,10 +110,13 @@ export class BotAI {
     const inGracePeriod = now - this.seekStartAt < SEEK_GRACE_MS;
     for (const [hiderId, pos] of hiderList) {
       if (hiderId === s.userId) continue;
+      const camo = pos.camouflage ?? 0; // 0=丸見え 〜 1=完璧な擬態
+      const effectiveRadius = s.detectRadius * (1 - camo * 0.4); // 擬態が良いほど気づく距離も縮む
       const d = Math.hypot(pos.x - s.x, pos.z - s.z);
       const cur = s.suspicion.get(hiderId) || 0;
-      if (!inGracePeriod && d < s.detectRadius && hasLineOfSight(s.x, s.z, pos.x, pos.z, this.world.colliders)) {
-        const next = cur + dt;
+      if (!inGracePeriod && d < effectiveRadius && hasLineOfSight(s.x, s.z, pos.x, pos.z, this.world.colliders)) {
+        const gainRate = 1 - camo * 0.75; // 擬態が良いほど怪しむスピードが遅くなる(最大75%減速)
+        const next = cur + dt * gainRate;
         if (next > 1.1) {
           s.suspicion.delete(hiderId);
           this.triggerFound(hiderId, s.userId);

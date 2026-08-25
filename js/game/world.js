@@ -44,7 +44,8 @@ export function buildWorld(scene) {
   colliders.push({ minX: half, maxX: half + 1, minZ: -half - 1, maxZ: half + 1, h: ROOM_HEIGHT }); // 右壁
 
   const props = [];
-  function addBox(x, z, w, h, d, mat, ry = 0) {
+  const propColors = []; // ボットの擬態判定用: {x, z, color}
+  function addBox(x, z, w, h, d, mat, ry = 0, color) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     mesh.position.set(x, h / 2, z);
     mesh.rotation.y = ry;
@@ -54,39 +55,42 @@ export function buildWorld(scene) {
     const cos = Math.abs(Math.cos(ry)), sin = Math.abs(Math.sin(ry));
     const ew = (w * cos + d * sin) / 2, ed = (w * sin + d * cos) / 2;
     colliders.push({ minX: x - ew, maxX: x + ew, minZ: z - ed, maxZ: z + ed, h });
+    if (color) propColors.push({ x, z, color });
     return mesh;
   }
-  function addCylinder(x, z, r, h, mat) {
+  function addCylinder(x, z, r, h, mat, color) {
     const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 16), mat);
     mesh.position.set(x, h / 2, z);
     mesh.castShadow = true;
     scene.add(mesh);
     props.push(mesh);
     colliders.push({ minX: x - r, maxX: x + r, minZ: z - r, maxZ: z + r, h });
+    if (color) propColors.push({ x, z, color });
     return mesh;
   }
 
+  const woodColor = '#8a5a34', wood2Color = '#5b3a20', fabricColor = '#3d6b8a', fabric2Color = '#8a3d3d', metalColor = '#8a8f96';
   const wood = new THREE.MeshStandardMaterial({ map: woodTexture(), roughness: 0.8 });
-  const wood2 = new THREE.MeshStandardMaterial({ map: woodTexture('#5b3a20'), roughness: 0.8 });
+  const wood2 = new THREE.MeshStandardMaterial({ map: woodTexture(wood2Color), roughness: 0.8 });
   const fabric = new THREE.MeshStandardMaterial({ map: fabricTexture(), roughness: 0.9 });
-  const fabric2 = new THREE.MeshStandardMaterial({ map: fabricTexture('#8a3d3d'), roughness: 0.9 });
+  const fabric2 = new THREE.MeshStandardMaterial({ map: fabricTexture(fabric2Color), roughness: 0.9 });
   const metal = new THREE.MeshStandardMaterial({ map: metalTexture(), roughness: 0.4, metalness: 0.6 });
 
-  addBox(-8, -8, 3, 0.9, 1.6, wood);      // テーブル
-  addBox(-8, -5.5, 1.2, 1.6, 1.2, fabric); // ソファ的な箱
-  addBox(-4, -9.5, 1.4, 1.8, 1.4, wood2, 0.4); // 本棚
-  addCylinder(3, -8, 0.6, 1.8, metal);     // ドラム缶
-  addCylinder(4.5, -6.5, 0.6, 1.8, metal);
-  addBox(8, -8, 2.4, 2.2, 2.4, fabric2);   // 大型ボックス
-  addBox(9, -3, 1.2, 1.2, 1.2, wood);
-  addBox(-9, 3, 1.6, 2.4, 1.6, metal, 0.3); // ロッカー
-  addBox(-6, 8, 3.2, 1.0, 1.6, wood);
-  addBox(0, 9, 1.4, 1.4, 1.4, fabric);
-  addBox(6, 8, 2.0, 1.8, 2.0, wood2, 0.6);
-  addCylinder(8.5, 3, 0.5, 2.4, metal);
-  addBox(-2, -2, 1.0, 1.0, 1.0, fabric2);
-  addBox(3, 1, 1.4, 0.6, 1.4, wood);
-  addBox(-4, 4, 0.9, 1.9, 0.9, metal);
+  addBox(-8, -8, 3, 0.9, 1.6, wood, 0, woodColor);      // テーブル
+  addBox(-8, -5.5, 1.2, 1.6, 1.2, fabric, 0, fabricColor); // ソファ的な箱
+  addBox(-4, -9.5, 1.4, 1.8, 1.4, wood2, 0.4, wood2Color); // 本棚
+  addCylinder(3, -8, 0.6, 1.8, metal, metalColor);     // ドラム缶
+  addCylinder(4.5, -6.5, 0.6, 1.8, metal, metalColor);
+  addBox(8, -8, 2.4, 2.2, 2.4, fabric2, 0, fabric2Color);   // 大型ボックス
+  addBox(9, -3, 1.2, 1.2, 1.2, wood, 0, woodColor);
+  addBox(-9, 3, 1.6, 2.4, 1.6, metal, 0.3, metalColor); // ロッカー
+  addBox(-6, 8, 3.2, 1.0, 1.6, wood, 0, woodColor);
+  addBox(0, 9, 1.4, 1.4, 1.4, fabric, 0, fabricColor);
+  addBox(6, 8, 2.0, 1.8, 2.0, wood2, 0.6, wood2Color);
+  addCylinder(8.5, 3, 0.5, 2.4, metal, metalColor);
+  addBox(-2, -2, 1.0, 1.0, 1.0, fabric2, 0, fabric2Color);
+  addBox(3, 1, 1.4, 0.6, 1.4, wood, 0, woodColor);
+  addBox(-4, 4, 0.9, 1.9, 0.9, metal, 0, metalColor);
 
   const light1 = new THREE.HemisphereLight(0xffffff, 0x3a3a3a, 0.9);
   scene.add(light1);
@@ -97,7 +101,17 @@ export function buildWorld(scene) {
   light3.position.set(10, 10, 5);
   scene.add(light3);
 
-  return { colliders, props, roomSize: ROOM_SIZE, roomHeight: ROOM_HEIGHT };
+  return { colliders, props, propColors, floorColor: '#cfd3d6', roomSize: ROOM_SIZE, roomHeight: ROOM_HEIGHT };
+}
+
+// 指定座標に最も近い家具の色(4ユニット以内)、無ければ床の色を返す(ボットの擬態判定用)
+export function nearestBackgroundColor(x, z, world) {
+  let best = null, bestDist = 4;
+  for (const p of world.propColors) {
+    const d = Math.hypot(p.x - x, p.z - z);
+    if (d < bestDist) { bestDist = d; best = p.color; }
+  }
+  return best || world.floorColor;
 }
 
 // 部屋の中からランダムな(何にも埋まっていない)スポーンポイントを1つ選ぶ

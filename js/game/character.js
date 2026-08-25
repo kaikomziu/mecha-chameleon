@@ -41,6 +41,7 @@ export class Character {
   resetPaint() {
     this.ctx.fillStyle = BASE_COLOR;
     this.ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+    this.painted = false; // 何も塗っていない=丸見え、の判定に使う
     if (this.texture) this.texture.needsUpdate = true;
   }
 
@@ -65,7 +66,16 @@ export class Character {
     // テクスチャの継ぎ目(左右端)もそれっぽく塗れるように補完
     if (x < brushSize) { this.ctx.beginPath(); this.ctx.arc(x + TEX_SIZE, y, brushSize, 0, Math.PI * 2); this.ctx.fill(); }
     if (x > TEX_SIZE - brushSize) { this.ctx.beginPath(); this.ctx.arc(x - TEX_SIZE, y, brushSize, 0, Math.PI * 2); this.ctx.fill(); }
+    this.painted = true;
     this.texture.needsUpdate = true;
+  }
+
+  // キャンバス全体の平均色を [r,g,b] で返す(擬態の色合わせ判定用)。重い処理なので間引いてサンプリング。
+  getAverageColor() {
+    const data = this.ctx.getImageData(0, 0, TEX_SIZE, TEX_SIZE).data;
+    let r = 0, g = 0, b = 0, n = 0;
+    for (let i = 0; i < data.length; i += 4 * 11) { r += data[i]; g += data[i + 1]; b += data[i + 2]; n++; }
+    return n ? [r / n, g / n, b / n] : [207, 207, 207];
   }
 
   exportPaintDataURL(maxSize = 48) {
@@ -76,12 +86,14 @@ export class Character {
     return small.toDataURL('image/jpeg', 0.55);
   }
 
-  applyPaintDataURL(dataUrl) {
+  applyPaintDataURL(dataUrl, onApplied) {
     const img = new Image();
     img.onload = () => {
       this.ctx.clearRect(0, 0, TEX_SIZE, TEX_SIZE);
       this.ctx.drawImage(img, 0, 0, TEX_SIZE, TEX_SIZE);
+      this.painted = true;
       this.texture.needsUpdate = true;
+      onApplied?.();
     };
     img.src = dataUrl;
   }
