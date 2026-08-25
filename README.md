@@ -4,32 +4,16 @@
 ビルド不要の素のHTML/CSS/JS(ES Modules)+ Three.js(擬似3D一人称)+ Supabase(認証・部屋・ランク・リアルタイム同期)。
 
 ## 遊び方
-1. Googleアカウントでログイン
+1. メールアドレス+パスワードで新規登録(確認メールのリンクを開いてからログイン)
 2. 部屋を作成 (プライベート/公開、最大人数、カメレオン(隠れる側)人数を設定) or コード/野良で参加
 3. 隠れる側は制限時間内にポーズを選び、自分の体を自由ブラシで塗って背景に擬態
 4. 鬼は歩き回って怪しい場所をクリック/タップして発砲
 5. 全員見つければ鬼の勝ち、時間切れで生き残りがいれば隠れる側の勝ち
 6. 勝つほどランクが上昇: ブロンズ→シルバー→ゴールド→プラチナ→ダイヤモンド→マスター
 
-## セットアップが必要な項目(あなたの作業)
-
-### Google OAuthログインの有効化(必須)
-Supabase側のGoogleログインを有効にするには、Google Cloud Console側でOAuthクライアントを発行する必要があります。
-
-1. https://console.cloud.google.com/ にアクセスし、プロジェクトを作成(または既存のものを選択)
-2. 「APIとサービス」→「OAuth同意画面」を設定(External、アプリ名は好きな名前でOK)
-3. 「認証情報」→「認証情報を作成」→「OAuthクライアントID」→ アプリケーションの種類は「ウェブアプリケーション」
-4. 「承認済みのリダイレクトURI」に以下を追加:
-   ```
-   https://kifnzvktwbomxthzvvgy.supabase.co/auth/v1/callback
-   ```
-5. 発行された「クライアントID」と「クライアントシークレット」をコピー
-6. Supabaseダッシュボード( https://supabase.com/dashboard/project/kifnzvktwbomxthzvvgy/auth/providers )を開き、
-   「Google」プロバイダーをオンにして、上記のクライアントID/シークレットを貼り付けて保存
-7. 同ダッシュボードの Authentication → URL Configuration で、Site URL / Redirect URLs に
-   公開後のGitHub PagesのURL(例: `https://kaikomziu.github.io/mecha-chameleon/`)を追加
-
-これが終わるまでは「Googleでログイン」ボタンを押すとエラーになります。それ以外(部屋・ランク・DB)は既に本番稼働状態です。
+## セットアップ
+認証はSupabase標準のメール+パスワードを使用しているため、**追加の手動セットアップは不要**(Google OAuthのようなCloud Console作業なし)。
+新規登録すると、Supabaseの組み込みメーラーから確認メールが届くので、リンクを開いてからログインする(迷惑メールフォルダに入ることがあるので注意)。
 
 ## 技術構成
 - フロントエンド: 素のES Modules (ビルド不要、GitHub Pagesでそのまま動作)
