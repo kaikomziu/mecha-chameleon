@@ -20,7 +20,6 @@
     <nav class="auth-tabs">
       <button class="auth-tab active" data-pane="auth-pane-login">ログイン</button>
       <button class="auth-tab" data-pane="auth-pane-signup">新規登録</button>
-      <button class="auth-tab" data-pane="auth-pane-phone">電話番号</button>
     </nav>
 
     <div id="auth-pane-login" class="auth-pane">
@@ -35,18 +34,6 @@
       <label class="field-label">メールアドレス<input id="signup-email" type="email" autocomplete="email" placeholder="you@example.com"></label>
       <label class="field-label">パスワード(6文字以上)<input id="signup-password" type="password" autocomplete="new-password" placeholder="••••••••"></label>
       <button id="btn-signup" class="btn-primary">アカウント作成</button>
-    </div>
-
-    <div id="auth-pane-phone" class="auth-pane hidden">
-      <div id="phone-step-1">
-        <label class="field-label">電話番号(例: 09012345678)<input id="phone-input" type="tel" autocomplete="tel" placeholder="09012345678"></label>
-        <button id="btn-send-code" class="btn-primary">認証コードを送信</button>
-      </div>
-      <div id="phone-step-2" class="hidden">
-        <label class="field-label">SMSに届いた6桁のコード<input id="phone-code-input" type="text" inputmode="numeric" maxlength="6" placeholder="123456"></label>
-        <button id="btn-verify-code" class="btn-primary">認証してログイン</button>
-        <button id="btn-resend-code" class="btn-ghost small">コードを再送 / 番号を変更</button>
-      </div>
     </div>
 
     <p id="auth-message" class="auth-hint"></p>

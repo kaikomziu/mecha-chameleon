@@ -15,19 +15,11 @@
 メール+パスワード認証は**追加の手動セットアップ不要**(Google OAuthのようなCloud Console作業なし)。
 新規登録すると、Supabaseの組み込みメーラーから確認メールが届くので、リンクを開いてからログインする(迷惑メールフォルダに入ることがあるので注意)。
 
-### 電話番号(SMS)ログインを有効にする場合(必須ではない・あなたの作業)
-電話番号ログインはコード側の実装済みですが、SMS送信を代行する外部プロバイダの契約がないと動きません(Supabaseが直接SMSは送れないため)。
-Supabaseが対応しているのは Twilio / Twilio Verify / MessageBird / Vonage / TextLocal。日本の携帯番号に送るなら Twilio が実績豊富です。
-
-1. https://www.twilio.com/try-twilio でアカウントを作成し、電話番号を1つ購入(無料トライアルには使える範囲に制限あり)
-2. コンソールから「Account SID」「Auth Token」と、購入した送信元番号(またはMessaging Service SID)を控える
-3. Supabaseダッシュボード( https://supabase.com/dashboard/project/kifnzvktwbomxthzvvgy/auth/providers )の「Phone」プロバイダーをオンにし、Twilioの認証情報を入力して保存
-4. 同ダッシュボードの Authentication → Sign In / Providers で「Enable phone confirmations」もオンにしておく
-
-**注意点:**
-- Twilio等の契約作業はGoogle Cloud Consoleと同様にサービス提供者側の年齢・利用規約の制約を受ける可能性があります(先にGoogleで年齢制限に当たった場合、Twilioでも同様の壁に当たる可能性があります)。
-- SMS送信は基本的に**1通ごとに課金**されます(メール認証は無料)。無料トライアル分を使い切ると送信が止まるので注意。
-- この設定が完了するまでは、ログイン画面の「電話番号」タブでコード送信を押すとエラーになりますが、メール+パスワードでのログインには影響しません。
+### 注意: Supabase組み込みメーラーの送信数制限
+Supabaseのデフォルトメール送信(SMTP未設定時)は**1時間あたり数通程度**とかなり少ない制限があります。開発中の連続テストや、遊ぶ人数が増えてきた場合に「登録したのに確認メールが届かない」状態になることがあります。
+対策(どちらもSupabaseダッシュボード → Authentication → Providers → Email から数分で設定可能、外部アカウント作成は不要):
+- **お手軽**: 「Confirm email」をオフにする → メール確認が不要になり、登録後すぐにログインできるようになる(その分メールアドレスの実在確認はされなくなる)
+- **本格的**: 独自SMTP(Resend/SendGram等)を設定する → 送信数制限が大幅に緩和される
 
 ## 技術構成
 - フロントエンド: 素のES Modules (ビルド不要、GitHub Pagesでそのまま動作)

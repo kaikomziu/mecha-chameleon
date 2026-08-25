@@ -38,7 +38,8 @@ button, input { font-family: inherit; }
 .auth-card h1 { font-size: 22px; margin: 8px 0 4px; }
 .web-badge { font-size: 11px; background: var(--accent); color: #05201c; padding: 2px 8px; border-radius: 20px; vertical-align: middle; }
 .auth-sub { color: var(--muted); font-size: 14px; line-height: 1.6; margin-bottom: 24px; }
-.auth-hint { color: var(--muted); font-size: 12px; margin-top: 16px; min-height: 14px; line-height: 1.6; }
+.auth-hint { color: var(--muted); font-size: 13px; font-weight: 600; margin-top: 16px; min-height: 14px; line-height: 1.6; }
+.btn-primary:disabled, .btn-ghost:disabled { opacity: .6; cursor: wait; }
 
 .auth-tabs { display: flex; gap: 6px; margin-bottom: 18px; background: var(--panel2); border-radius: 10px; padding: 4px; }
 .auth-tab { flex: 1; background: none; border: none; color: var(--muted); padding: 9px 0; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; }

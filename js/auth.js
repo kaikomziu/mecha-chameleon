@@ -54,27 +54,6 @@ export async function updatePassword(newPassword) {
   if (error) throw error;
 }
 
-// 日本の電話番号入力(090xxxxxxxx等)をE.164形式(+8190xxxxxxxx)に変換
-export function toE164JP(input) {
-  const digits = input.replace(/[^\d+]/g, '');
-  if (digits.startsWith('+')) return digits;
-  if (digits.startsWith('0')) return '+81' + digits.slice(1);
-  if (digits.startsWith('81')) return '+' + digits;
-  return '+81' + digits;
-}
-
-// SMS認証コードを送信(未登録の番号なら自動的にアカウントも作成される)
-export async function sendPhoneOtp(phoneInput) {
-  const phone = toE164JP(phoneInput);
-  const { error } = await supabase.auth.signInWithOtp({ phone });
-  if (error) throw error;
-  return phone;
-}
-
-export async function verifyPhoneOtp(phoneE164, code) {
-  const { error } = await supabase.auth.verifyOtp({ phone: phoneE164, token: code.trim(), type: 'sms' });
-  if (error) throw error;
-}
 
 export async function signOut() {
   await supabase.auth.signOut();
