@@ -201,7 +201,12 @@ export class Game {
     this.hud.querySelector('.crosshair').classList.toggle('hidden', !isHunter);
     this.hud.querySelector('.hud-repaint').classList.add('hidden');
     this._setOverlay(this.caught ? '見つかってしまった…\n結果発表をお待ちください' : null);
-    if (this.isHost) this.botAI.enterSeeking();
+    if (this.isHost) {
+      const realHiderPositions = [...this._aliveHiderPositions()]
+        .filter(([id]) => !this.players.find((p) => p.user_id === id)?.is_bot)
+        .map(([, pos]) => pos);
+      this.botAI.enterSeeking(realHiderPositions);
+    }
   }
 
   _enterResults() {

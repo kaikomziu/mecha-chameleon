@@ -4,6 +4,8 @@ import { resolveCollisions, randomSpawnPoint, hasLineOfSight } from './world.js'
 const PLAYER_RADIUS = 0.38;
 const HIDER_PAINT_COLORS = ['#8a5a34', '#5b3a20', '#cfd3d6', '#a9adb0', '#3d6b8a', '#8a3d3d', '#8a8f96', '#c9cdd2', '#4b7a3a', '#e7e2d6'];
 const POSE_KEYS = Object.keys(POSES);
+const SEEK_GRACE_MS = 4000; // 索敵フェーズ開始直後は発見しない猶予(運ゲー即死対策)
+const MIN_HUNTER_SPAWN_DIST_FROM_HIDER = 7; // ハンターが隠れる側のすぐそばに湧かないようにする最低距離
 
 // ホストのクライアント上で「CPU」プレイヤーの動き・擬態・索敵を丸ごとシミュレートする。
 // 生成した行動はGame側のコールバック経由で本物のプレイヤーと全く同じプロトコル(pos/paint/hider_found)で
@@ -44,8 +46,16 @@ export class BotAI {
     }
   }
 
-  // 隠れフェーズ終了時: 隠れる側ボットは最終位置とペイントを1回だけ送って静止させる
-  enterSeeking() {
+  // 隠れフェーズ終了時: 隠れる側ボットは最終位置とペイントを1回だけ送って静止させる。
+  // extraHiderPositions: 本物のプレイヤーの隠れる側の位置([{x,z},...])。ハンターの湧き場所を離すために使う。
+  enterSeeking(extraHiderPositions = []) {
+    this.seekStartAt = performance.now();
+
+    const hiderPositions = [...extraHiderPositions];
+    for (const s of this.states.values()) {
+      if (s.role === 'hider') hiderPositions.push({ x: s.x, z: s.z });
+    }
+
     for (const s of this.states.values()) {
       if (s.role === 'hider') {
         if (s.character) {
@@ -55,12 +65,18 @@ export class BotAI {
           s.character = null;
         }
       } else if (s.role === 'hunter') {
-        const [x, z] = randomSpawnPoint(this.world);
+        // 隠れる側の近くに即湧きしないよう、離れた場所が出るまで数回リトライ
+        let x, z;
+        for (let i = 0; i < 12; i++) {
+          [x, z] = randomSpawnPoint(this.world);
+          const tooClose = hiderPositions.some((p) => Math.hypot(p.x - x, p.z - z) < MIN_HUNTER_SPAWN_DIST_FROM_HIDER);
+          if (!tooClose) break;
+        }
         s.x = x; s.z = z;
         s.waypoint = null;
         s.suspicion = new Map();
         s.speed = 2.6 + Math.random() * 0.9;
-        s.detectRadius = 5 + Math.random() * 1.6;
+        s.detectRadius = 3 + Math.random() * 1.2;
         s.lastSent = 0;
       }
     }
@@ -91,11 +107,12 @@ export class BotAI {
       this.sendPos({ userId: s.userId, role: 'hunter', x: s.x, z: s.z, yaw, pose: 'standing' });
     }
 
+    const inGracePeriod = now - this.seekStartAt < SEEK_GRACE_MS;
     for (const [hiderId, pos] of hiderList) {
       if (hiderId === s.userId) continue;
       const d = Math.hypot(pos.x - s.x, pos.z - s.z);
       const cur = s.suspicion.get(hiderId) || 0;
-      if (d < s.detectRadius && hasLineOfSight(s.x, s.z, pos.x, pos.z, this.world.colliders)) {
+      if (!inGracePeriod && d < s.detectRadius && hasLineOfSight(s.x, s.z, pos.x, pos.z, this.world.colliders)) {
         const next = cur + dt;
         if (next > 1.1) {
           s.suspicion.delete(hiderId);
