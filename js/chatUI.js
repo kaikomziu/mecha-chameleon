@@ -14,6 +14,7 @@ export function mountChat(container, roomId, { compact = false } = {}) {
     ${compact ? '<button class="chat-toggle">💬</button>' : ''}
     <div class="chat-panel${compact ? ' hidden' : ''}">
       <div class="chat-messages"></div>
+      <div class="chat-typing hidden"></div>
       <div class="chat-input-row">
         <input class="chat-input" type="text" maxlength="200" placeholder="メッセージを入力…">
         <button class="chat-send">送信</button>
@@ -25,6 +26,7 @@ export function mountChat(container, roomId, { compact = false } = {}) {
   const inputEl = root.querySelector('.chat-input');
   const panel = root.querySelector('.chat-panel');
   const toggleBtn = root.querySelector('.chat-toggle');
+  const typingEl = root.querySelector('.chat-typing');
 
   let unread = 0;
   function appendMessage({ userId, name, text }) {
@@ -39,8 +41,30 @@ export function mountChat(container, roomId, { compact = false } = {}) {
     }
   }
 
+  // ============ 入力中インジケーター ============
+  const typingUsers = new Map(); // userId -> {name, timeoutId}
+  function renderTyping() {
+    const names = [...typingUsers.values()].map((t) => t.name);
+    if (!names.length) { typingEl.classList.add('hidden'); typingEl.textContent = ''; return; }
+    typingEl.classList.remove('hidden');
+    typingEl.textContent = `${names.join('、')} が入力中…`;
+  }
+
   const chat = new ChatChannel(roomId);
-  chat.onMessage(appendMessage);
+  chat.onMessage((payload) => {
+    appendMessage(payload);
+    // メッセージが届いたらそのユーザーの「入力中」は消す
+    const t = typingUsers.get(payload.userId);
+    if (t) { clearTimeout(t.timeoutId); typingUsers.delete(payload.userId); renderTyping(); }
+  });
+  chat.onTyping(({ userId, name }) => {
+    if (!userId || userId === getUser()?.id) return;
+    const existing = typingUsers.get(userId);
+    if (existing) clearTimeout(existing.timeoutId);
+    const timeoutId = setTimeout(() => { typingUsers.delete(userId); renderTyping(); }, 3000);
+    typingUsers.set(userId, { name, timeoutId });
+    renderTyping();
+  });
   chat.subscribe();
 
   function doSend() {
@@ -48,6 +72,14 @@ export function mountChat(container, roomId, { compact = false } = {}) {
     inputEl.value = '';
   }
   root.querySelector('.chat-send').addEventListener('click', doSend);
+  let lastTypingSentAt = 0;
+  inputEl.addEventListener('input', () => {
+    const now = Date.now();
+    if (inputEl.value && now - lastTypingSentAt > 1500) {
+      lastTypingSentAt = now;
+      chat.sendTyping();
+    }
+  });
   inputEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') doSend();
     e.stopPropagation(); // ゲーム側のWASD等キー操作に文字入力が奪われないように
@@ -65,5 +97,11 @@ export function mountChat(container, roomId, { compact = false } = {}) {
     });
   }
 
-  return { destroy: () => { chat.destroy(); root.remove(); } };
+  return {
+    destroy: () => {
+      for (const t of typingUsers.values()) clearTimeout(t.timeoutId);
+      chat.destroy();
+      root.remove();
+    },
+  };
 }

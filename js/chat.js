@@ -13,6 +13,22 @@ export class ChatChannel {
     return this;
   }
 
+  onTyping(fn) {
+    this.channel.on('broadcast', { event: 'typing' }, ({ payload }) => fn(payload));
+    return this;
+  }
+
+  sendTyping() {
+    const profile = getProfile();
+    const user = getUser();
+    if (!user) return;
+    this.channel.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: { userId: user.id, name: profile?.display_name || 'プレイヤー' },
+    });
+  }
+
   subscribe() {
     return new Promise((resolve) => {
       this.channel.subscribe((status) => { if (status === 'SUBSCRIBED') resolve(); });
