@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>めっちゃカメレオン Web</title>
+<meta name="description" content="スマホとPCでクロスプレイできる擬態かくれんぼゲーム">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦎</text></svg>">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ============ 認証画面 ============ -->
+<section id="screen-auth" class="screen">
+  <div class="auth-card">
+    <div class="auth-logo">🦎</div>
+    <h1>めっちゃカメレオン <span class="web-badge">Web</span></h1>
+    <p class="auth-sub">擬態して隠れる、見つけて撃つ。<br>スマホ・PC混合でそのまま遊べるマルチプレイかくれんぼ。</p>
+    <button id="btn-google-login" class="btn-primary btn-google">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84c-.21 1.13-.84 2.09-1.8 2.73v2.27h2.9c1.7-1.57 2.7-3.88 2.7-6.64z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.27c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.96v2.34C2.44 15.98 5.48 18 9 18z"/><path fill="#FBBC05" d="M3.95 10.69c-.18-.54-.28-1.1-.28-1.69s.1-1.15.28-1.69V4.97H.96A8.996 8.996 0 000 9c0 1.45.35 2.83.96 4.03l2.99-2.34z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0 5.48 0 2.44 2.02.96 4.97l2.99 2.34C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
+      Googleでログイン
+    </button>
+    <p class="auth-hint">ログインするとランク・戦績がクラウドに保存されます</p>
+  </div>
+</section>
+
+<!-- ============ ロビー画面 ============ -->
+<section id="screen-lobby" class="screen hidden">
+  <header class="lobby-header">
+    <div class="profile-block">
+      <div class="profile-name-row">
+        <span id="profile-name">プレイヤー</span>
+        <span id="profile-rank-badge" class="rank-badge">ブロンズ</span>
+      </div>
+      <div id="profile-stats" class="muted small"></div>
+      <div id="profile-next-rank" class="muted small"></div>
+    </div>
+    <button id="btn-logout" class="btn-ghost small">ログアウト</button>
+  </header>
+
+  <nav class="lobby-tabs">
+    <button class="lobby-tab active" data-pane="pane-create">部屋を作る</button>
+    <button class="lobby-tab" data-pane="pane-join">コードで参加</button>
+    <button class="lobby-tab" data-pane="pane-public">野良を探す</button>
+    <button class="lobby-tab" data-pane="pane-rank">ランキング</button>
+    <button class="lobby-tab" data-pane="pane-profile">プロフィール</button>
+  </nav>
+
+  <div class="lobby-panes">
+    <div id="pane-create" class="lobby-pane">
+      <label class="field-label">部屋名<input id="create-name" type="text" maxlength="24" placeholder="例: friday-night"></label>
+      <label class="field-check"><input id="create-public" type="checkbox"> 公開部屋にする(野良から入室可)</label>
+      <label class="field-label">最大人数: <span id="create-max-val">12</span>人
+        <input id="create-max" type="range" min="2" max="12" value="12"></label>
+      <label class="field-label">カメレオン(隠れる側)人数: <span id="create-hiders-val">1</span>人
+        <input id="create-hiders" type="range" min="1" max="11" value="1"></label>
+      <button id="btn-create-room" class="btn-primary">部屋を作成</button>
+    </div>
+
+    <div id="pane-join" class="lobby-pane hidden">
+      <label class="field-label">部屋コード(5桁)
+        <input id="join-code-input" type="text" maxlength="5" placeholder="ABCDE" style="text-transform:uppercase"></label>
+      <button id="btn-join-code" class="btn-primary">参加する</button>
+    </div>
+
+    <div id="pane-public" class="lobby-pane hidden">
+      <button id="btn-refresh-public" class="btn-ghost small">🔄 更新</button>
+      <div id="public-room-list" class="list-block"></div>
+    </div>
+
+    <div id="pane-rank" class="lobby-pane hidden">
+      <div id="leaderboard-list" class="list-block"></div>
+    </div>
+
+    <div id="pane-profile" class="lobby-pane hidden">
+      <label class="field-label">表示名
+        <input id="name-input" type="text" maxlength="16"></label>
+      <button id="btn-save-name" class="btn-primary small">名前を保存</button>
+      <div class="rank-ladder">
+        <div class="rank-ladder-item" style="background:#a97142">ブロンズ 0勝〜</div>
+        <div class="rank-ladder-item" style="background:#9aa5b1">シルバー 3勝〜</div>
+        <div class="rank-ladder-item" style="background:#e0b23b">ゴールド 10勝〜</div>
+        <div class="rank-ladder-item" style="background:#6fd6c9">プラチナ 25勝〜</div>
+        <div class="rank-ladder-item" style="background:#7ab8ff">ダイヤモンド 50勝〜</div>
+        <div class="rank-ladder-item" style="background:#ff6fae">マスター 100勝〜</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 部屋待機画面 ============ -->
+<section id="screen-room" class="screen hidden">
+  <header class="room-header">
+    <div>
+      <div class="room-code-big" id="room-code-display">-----</div>
+      <div id="room-name-display" class="muted"></div>
+    </div>
+    <button id="btn-leave-room" class="btn-ghost small">退室</button>
+  </header>
+
+  <div class="share-row">
+    <input id="room-share-url" type="text" readonly>
+    <button id="btn-copy-url" class="btn-ghost small">URLコピー</button>
+  </div>
+
+  <div id="room-host-settings" class="muted small hidden">カメレオン(隠れる側): <span id="room-hider-count-live">1</span>人 ※部屋作成時に設定</div>
+
+  <div class="room-players-block">
+    <div class="row-between"><b>参加者 (<span id="room-player-count">0人</span>)</b></div>
+    <div id="room-player-list" class="list-block"></div>
+  </div>
+
+  <div class="room-actions">
+    <button id="btn-ready" class="btn-secondary">準備OK</button>
+    <button id="btn-start-game" class="btn-primary hidden">ゲーム開始</button>
+  </div>
+</section>
+
+<!-- ============ ゲーム画面 ============ -->
+<section id="screen-game" class="screen hidden">
+  <div id="game-canvas-root" class="game-canvas-root"></div>
+  <div id="game-ui-root" class="game-ui-root"></div>
+</section>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://esm.sh/three@0.160.0"
+  }
+}
+</script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
