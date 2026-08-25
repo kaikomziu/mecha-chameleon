@@ -1,5 +1,5 @@
 import { initAuth, onAuthChange, signInWithEmail, signUpWithEmail, signInAsGuest, signOut, updateDisplayName, getUser } from './auth.js';
-import { createRoom, joinRoomByCode, listPublicRooms, leaveRoom, setReady, fetchRoomPlayers, fetchRoom, startGame, subscribeRoom, addBot, removeBot } from './rooms.js';
+import { createRoom, joinRoomByCode, listPublicRooms, leaveRoom, setReady, fetchRoomPlayers, fetchRoom, startGame, subscribeRoom, addBot, removeBot, updateHiderCount } from './rooms.js';
 import { rankTierForWins, nextRankThreshold, GAME_CONFIG } from './config.js';
 import { fetchLeaderboard } from './rank.js';
 import { mountChat } from './chatUI.js';
@@ -295,8 +295,20 @@ function renderRoomHeader() {
   $('#btn-start-game').classList.toggle('hidden', !isHost);
   $('#room-host-settings').classList.toggle('hidden', !isHost);
   $('#room-hider-count-live').textContent = r.hider_count;
+  const total = Math.max(state.players.length, 1);
+  $('#hider-count-hint').textContent = `(参加者${total}人 / 鬼${Math.max(total - r.hider_count, 0)}人)`;
   $('#btn-add-bot').classList.toggle('hidden', !isHost || state.players.length >= r.max_players);
 }
+
+$('#btn-hider-minus').addEventListener('click', () => {
+  if (!state.room) return;
+  updateHiderCount(state.roomId, Math.max(1, state.room.hider_count - 1));
+});
+$('#btn-hider-plus').addEventListener('click', () => {
+  if (!state.room) return;
+  const cap = Math.max(1, state.players.length - 1);
+  updateHiderCount(state.roomId, Math.min(cap, state.room.hider_count + 1));
+});
 
 function renderRoomPlayers() {
   const list = $('#room-player-list');

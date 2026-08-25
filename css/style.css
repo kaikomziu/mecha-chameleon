@@ -92,6 +92,8 @@ button, input { font-family: inherit; }
 .room-players-block { margin: 0 20px 20px; }
 .room-actions { display: flex; gap: 10px; padding: 0 20px 30px; }
 #room-host-settings { padding: 0 20px 12px; }
+.hider-count-editor { display: flex; align-items: center; gap: 8px; padding: 0 20px 12px; font-size: 13px; }
+.hider-count-editor #room-hider-count-live { font-weight: 800; color: var(--accent); min-width: 1.4em; text-align: center; }
 
 /* ============ ゲーム画面 ============ */
 #screen-game { padding: 0; background: #000; }

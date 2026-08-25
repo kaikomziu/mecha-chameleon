@@ -193,6 +193,11 @@ export async function startGame(room) {
     .eq('id', room.id);
 }
 
+// ホストが待機画面からカメレオン(隠れる側)人数をその場で調整する(部屋の作り直し不要)
+export async function updateHiderCount(roomId, hiderCount) {
+  await supabase.from('mc_rooms').update({ hider_count: hiderCount, updated_at: new Date().toISOString() }).eq('id', roomId);
+}
+
 // ラウンド終了(ホストのみ呼び出す想定): 勝敗を記録し結果フェーズへ
 export async function endRound(room, winnerSide, players) {
   const endsAt = new Date(Date.now() + 10000).toISOString();

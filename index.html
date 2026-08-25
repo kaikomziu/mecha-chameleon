@@ -136,7 +136,13 @@
     <button id="btn-copy-url" class="btn-ghost small">URLコピー</button>
   </div>
 
-  <div id="room-host-settings" class="muted small hidden">カメレオン(隠れる側): <span id="room-hider-count-live">1</span>人 ※部屋作成時に設定</div>
+  <div id="room-host-settings" class="hider-count-editor hidden">
+    <span>カメレオン(隠れる側)人数:</span>
+    <button id="btn-hider-minus" class="btn-small">−</button>
+    <span id="room-hider-count-live">1</span>
+    <button id="btn-hider-plus" class="btn-small">+</button>
+    <span class="muted small" id="hider-count-hint"></span>
+  </div>
 
   <div class="room-players-block">
     <div class="row-between">

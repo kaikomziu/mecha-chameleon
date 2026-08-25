@@ -415,8 +415,9 @@ export class Game {
     if (this.room.status !== 'seeking' || this.myRole !== 'hunter') return;
     const ray = new THREE.Raycaster();
     ray.setFromCamera({ x: 0, y: 0 }, this.camera);
-    const hits = ray.intersectObjects(this.scene.children, true).filter((h) => h.distance < 30);
-    if (!hits.length) return;
+    // 部屋の対角線(26x26想定で約37)より少し余裕を持たせて、遠くの的も撃ち漏らさないように
+    const hits = ray.intersectObjects(this.scene.children, true).filter((h) => h.distance < 50);
+    if (!hits.length) { this._flashHit(false); return; }
     const first = hits[0];
     let obj = first.object;
     let pid = obj.userData.playerId;
