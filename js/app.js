@@ -1,4 +1,4 @@
-import { initAuth, onAuthChange, onPasswordRecovery, signInWithEmail, signUpWithEmail, resetPassword, updatePassword, signOut, updateDisplayName, getUser } from './auth.js';
+import { initAuth, onAuthChange, onPasswordRecovery, signInWithEmail, signUpWithEmail, resetPassword, updatePassword, sendPhoneOtp, verifyPhoneOtp, signOut, updateDisplayName, getUser } from './auth.js';
 import { createRoom, joinRoomByCode, listPublicRooms, leaveRoom, setReady, fetchRoomPlayers, fetchRoom, startGame, subscribeRoom } from './rooms.js';
 import { rankTierForWins, nextRankThreshold, GAME_CONFIG } from './config.js';
 import { fetchLeaderboard } from './rank.js';
@@ -81,8 +81,43 @@ function translateAuthError(msg) {
   if (/Invalid login credentials/i.test(msg)) return 'メールアドレスまたはパスワードが間違っています';
   if (/User already registered/i.test(msg)) return 'このメールアドレスは既に登録されています';
   if (/Email not confirmed/i.test(msg)) return 'メール確認がまだ完了していません';
+  if (/Unsupported phone provider|sms.*not.*enabled|phone.*disabled/i.test(msg)) return 'SMS認証がまだ有効化されていません(管理者に設定を依頼してください)';
+  if (/Invalid|expired.*(otp|token)/i.test(msg)) return 'コードが正しくないか期限切れです';
   return msg;
 }
+
+// ============ 電話番号ログイン(SMS OTP) ============
+let sentPhoneE164 = null;
+$('#btn-send-code').addEventListener('click', async () => {
+  const raw = $('#phone-input').value;
+  if (!raw) return setAuthMessage('電話番号を入力してください', true);
+  try {
+    sentPhoneE164 = await sendPhoneOtp(raw);
+    setAuthMessage(`${sentPhoneE164} にコードを送信しました`);
+    $('#phone-step-1').classList.add('hidden');
+    $('#phone-step-2').classList.remove('hidden');
+  } catch (e) {
+    setAuthMessage('送信に失敗しました: ' + translateAuthError(e.message), true);
+  }
+});
+
+$('#btn-verify-code').addEventListener('click', async () => {
+  const code = $('#phone-code-input').value;
+  if (!sentPhoneE164 || !code) return setAuthMessage('コードを入力してください', true);
+  try {
+    await verifyPhoneOtp(sentPhoneE164, code);
+  } catch (e) {
+    setAuthMessage('認証に失敗しました: ' + translateAuthError(e.message), true);
+  }
+});
+
+$('#btn-resend-code').addEventListener('click', () => {
+  sentPhoneE164 = null;
+  $('#phone-code-input').value = '';
+  $('#phone-step-2').classList.add('hidden');
+  $('#phone-step-1').classList.remove('hidden');
+  setAuthMessage('');
+});
 
 $('#btn-logout').addEventListener('click', () => signOut());
 
