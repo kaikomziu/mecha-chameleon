@@ -25,7 +25,7 @@ export class Character {
   constructor(pose = 'standing') {
     this.canvas = document.createElement('canvas');
     this.canvas.width = this.canvas.height = TEX_SIZE;
-    this.ctx = this.canvas.getContext('2d');
+    this.ctx = this.canvas.getContext('2d', { willReadFrequently: true }); // getAverageColor()でgetImageDataを使うため
     this.resetPaint();
 
     this.texture = new THREE.CanvasTexture(this.canvas);
