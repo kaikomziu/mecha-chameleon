@@ -462,7 +462,7 @@ export class Game {
       const yaw = this.controls.yaw;
       const sin = Math.sin(yaw), cos = Math.cos(yaw);
       const dx = (moveX * cos - moveZ * sin) * speed * dt;
-      const dz = (moveX * sin + moveZ * cos) * speed * dt;
+      const dz = -(moveX * sin + moveZ * cos) * speed * dt;
       const nx = this.pos.x + dx, nz = this.pos.z + dz;
       const [rx, rz] = resolveCollisions(nx, nz, PLAYER_RADIUS, this.world.colliders);
       this.pos.x = rx; this.pos.z = rz;
