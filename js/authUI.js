@@ -1,19 +1,10 @@
 // ログイン/新規登録/ゲスト参加/プロフィール表示まわりのUI配線。
-import { initAuth, onAuthChange, signInWithEmail, signUpWithEmail, signInAsGuest, signOut, updateDisplayName } from './auth.js';
+import { initAuth, onAuthChange, signInAsGuest, signOut, updateDisplayName } from './auth.js';
+import { supabase } from './supabaseClient.js';
 import { rankTierForWins, nextRankThreshold } from './config.js';
 import { joinRoomByCode } from './rooms.js';
 import { $, state, showScreen } from './appState.js';
 import { enterRoom } from './roomUI.js';
-
-document.querySelectorAll('.auth-tab').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.auth-tab').forEach((b) => b.classList.remove('active'));
-    document.querySelectorAll('.auth-pane').forEach((p) => p.classList.add('hidden'));
-    btn.classList.add('active');
-    $('#' + btn.dataset.pane).classList.remove('hidden');
-    $('#auth-message').textContent = '';
-  });
-});
 
 function setAuthMessage(text, isError = false) {
   const el = $('#auth-message');
@@ -43,28 +34,15 @@ function translateAuthError(msg) {
   return msg;
 }
 
-$('#btn-login').addEventListener('click', () => withLoading($('#btn-login'), 'ログイン中…', async () => {
-  const email = $('#login-email').value, password = $('#login-password').value;
-  if (!email || !password) return setAuthMessage('メールアドレスとパスワードを入力してください', true);
-  try {
-    await signInWithEmail(email, password);
-  } catch (e) {
-    setAuthMessage('ログインに失敗しました: ' + translateAuthError(e.message), true);
-  }
+// ログインは かるわかGAMESアカウント。以前のメール+パスワードのアカウントは、ログイン後に「引き継ぐ」で紐づけられる(ランク・戦績はそのまま)
+const KA_APP = 'mecha-chameleon';
+$('#btn-ka-login').addEventListener('click', () => withLoading($('#btn-ka-login'), 'ログイン中…', async () => {
+  if (!window.KaAccount) return setAuthMessage('かるわかGAMESアカウントを読み込めませんでした。ページを読み込み直してください', true);
+  setAuthMessage('');
+  await window.KaAccount.supabaseLogin({ app: KA_APP, supabase, idLabel: 'メールアドレス' });
 }));
-
-$('#btn-signup').addEventListener('click', () => withLoading($('#btn-signup'), '登録中…', async () => {
-  const name = $('#signup-name').value, email = $('#signup-email').value, password = $('#signup-password').value;
-  if (!email || !password) return setAuthMessage('メールアドレスとパスワードを入力してください', true);
-  if (password.length < 6) return setAuthMessage('パスワードは6文字以上にしてください', true);
-  try {
-    const { hasSession } = await signUpWithEmail(email, password, name);
-    if (hasSession) return; // onAuthChangeが自動でロビーへ遷移させる
-    setAuthMessage('登録はできましたが、まだログインできません(管理者にメール確認の解除を依頼してください)', true);
-  } catch (e) {
-    setAuthMessage('登録に失敗しました: ' + translateAuthError(e.message), true);
-  }
-}));
+// ほかのゲームでかるわかGAMESにログイン済みなら、紐づけ済みの場合だけ自動でログインする
+if (window.KaAccount) window.KaAccount.supabaseAuto({ app: KA_APP, supabase });
 
 $('#btn-guest').addEventListener('click', () => withLoading($('#btn-guest'), '参加中…', async () => {
   try {
@@ -74,7 +52,8 @@ $('#btn-guest').addEventListener('click', () => withLoading($('#btn-guest'), '�
   }
 }));
 
-$('#btn-logout').addEventListener('click', () => signOut());
+// ログアウトは、かるわかGAMESアカウントからのログアウトも兼ねる
+$('#btn-logout').addEventListener('click', async () => { await signOut(); try { await window.KaAccount?.logout(); } catch (e) { /* ignore */ } });
 $('#btn-save-name').addEventListener('click', () => updateDisplayName($('#name-input').value));
 
 function renderProfile(profile) {
@@ -89,7 +68,11 @@ function renderProfile(profile) {
 }
 
 let triedAutoRejoin = false;
+// 以前のメール+パスワードでログイン中の人には、かるわかGAMESアカウントへの引き継ぎボタンを出す(ゲストと、すでに引き継いだ人には出さない)
+const kaLinkBtn = $('#btn-ka-link');
+kaLinkBtn.addEventListener('click', () => window.KaAccount?.supabaseLogin({ app: KA_APP, supabase, idLabel: 'メールアドレス' }));
 onAuthChange((user, profile) => {
+  kaLinkBtn.classList.toggle('hidden', !user || user.is_anonymous || user.user_metadata?.ka || user.user_metadata?.ka_linked);
   if (!user) { showScreen('auth'); return; }
   if (!state.roomId) {
     showScreen('lobby');

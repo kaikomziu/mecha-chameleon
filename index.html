@@ -7,6 +7,8 @@
 <meta name="description" content="スマホとPCでクロスプレイできる擬態かくれんぼゲーム">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦎</text></svg>">
 <link rel="stylesheet" href="css/style.css">
+<!-- かるわかGAMESアカウント(ログインは全ゲーム共通) -->
+<script src="https://kaikomziu.github.io/game-links/js/karuwaka-account.js" data-badge="off"></script>
 </head>
 <body>
 
@@ -17,22 +19,9 @@
     <h1>めっちゃカメレオン <span class="web-badge">Web</span></h1>
     <p class="auth-sub">擬態して隠れる、見つけて撃つ。<br>スマホ・PC混合でそのまま遊べるマルチプレイかくれんぼ。</p>
 
-    <nav class="auth-tabs">
-      <button class="auth-tab active" data-pane="auth-pane-login">ログイン</button>
-      <button class="auth-tab" data-pane="auth-pane-signup">新規登録</button>
-    </nav>
-
-    <div id="auth-pane-login" class="auth-pane">
-      <label class="field-label">メールアドレス<input id="login-email" type="email" autocomplete="email" placeholder="you@example.com"></label>
-      <label class="field-label">パスワード<input id="login-password" type="password" autocomplete="current-password" placeholder="••••••••"></label>
-      <button id="btn-login" class="btn-primary">ログイン</button>
-    </div>
-
-    <div id="auth-pane-signup" class="auth-pane hidden">
-      <label class="field-label">表示名<input id="signup-name" type="text" maxlength="16" placeholder="ゲーム内での表示名"></label>
-      <label class="field-label">メールアドレス<input id="signup-email" type="email" autocomplete="email" placeholder="you@example.com"></label>
-      <label class="field-label">パスワード(6文字以上)<input id="signup-password" type="password" autocomplete="new-password" placeholder="••••••••"></label>
-      <button id="btn-signup" class="btn-primary">アカウント作成</button>
+    <div id="auth-pane-ka" class="auth-pane">
+      <button id="btn-ka-login" class="btn-primary">🔑 かるわかGAMESアカウントでログイン / 登録</button>
+      <p class="auth-hint small-note">かるわかGAMESのほかのゲームと共通のアカウントです。以前のメールアドレスのアカウントは、ログイン後に引き継げます。</p>
     </div>
 
     <p id="auth-message" class="auth-hint"></p>
@@ -41,7 +30,7 @@
       <div class="guest-divider">または</div>
       <label class="field-label">表示名<input id="guest-name" type="text" maxlength="16" placeholder="ニックネーム"></label>
       <button id="btn-guest" class="btn-secondary">🎮 ゲストとして今すぐ参加(登録不要)</button>
-      <p class="auth-hint small-note">ゲストはランクが記録されません。あとで正式登録もできます。</p>
+      <p class="auth-hint small-note">ゲストはランクが記録されません。</p>
     </div>
 
     <p class="disclaimer">
@@ -64,6 +53,7 @@
       <div id="profile-stats" class="muted small"></div>
       <div id="profile-next-rank" class="muted small"></div>
     </div>
+    <button id="btn-ka-link" class="btn-ghost small hidden" title="このアカウントを、かるわかGAMESアカウントに引き継ぎます">🔑 かるわかGAMESに引き継ぐ</button>
     <button id="btn-logout" class="btn-ghost small">ログアウト</button>
   </header>
 
